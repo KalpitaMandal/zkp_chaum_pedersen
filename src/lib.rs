@@ -1,4 +1,5 @@
-use num_bigint::BigUint; // Importing big unsigned integers, i.e +ve numbers including zero
+use num_bigint::{BigUint, RandBigInt}; // Importing big unsigned integers, i.e +ve numbers including zero
+use rand;
 
 /// generator^x mod p
 /// x = secret key
@@ -14,14 +15,13 @@ pub fn exponentiate(n: &BigUint, exponent: &BigUint, modulus: &BigUint) -> BigUi
 /// x = secret key
 /// q = order of the finite group
 pub fn solve(k: &BigUint, c: &BigUint, x: &BigUint, q: &BigUint) -> BigUint {
+    // case 1: k > c * x, then output is positive
     if *k >= c * x {
-        // case 1: k > c * x, then output is positive
         return (k - c * x).modpow(&BigUint::from(1u32), q);
-    } else {
-        // case 2: k < c * x, then output is negative
-        // We have to do additive inverse for the correct value
-        return q - ((c * x) - k).modpow(&BigUint::from(1u32), q);
     }
+    // case 2: k < c * x, then output is negative
+    // We have to do additive inverse for the correct value
+    return q - ((c * x) - k).modpow(&BigUint::from(1u32), q);
 }
 
 /// cond1: r1 == alpha^s * y1^c
@@ -45,6 +45,11 @@ pub fn verify(
     let cond1 = *r1 == (alpha.modpow(s, p) * y1.modpow(c, p)).modpow(&BigUint::from(1u32), &p);
     let cond2 = *r2 == (beta.modpow(s, p) * y2.modpow(c, p)).modpow(&BigUint::from(1u32), &p);
     cond1 && cond2
+}
+
+pub fn generate_random_below(bound: &BigUint) -> BigUint {
+    let mut rng = rand::thread_rng();
+    rng.gen_biguint_below(bound)
 }
 
 #[cfg(test)]
@@ -88,5 +93,34 @@ mod test {
 
         let result = verify(&r1, &r2, &y1, &y2, &s_fake, &c, &p, &alpha, &beta);
         assert!(!result);
+    }
+
+        #[test]
+    fn test_toy_example_with_rng() {
+        // public constants
+        let alpha = BigUint::from(4u32);
+        let beta = BigUint::from(9u32);
+        let p = BigUint::from(23u32);
+        let q = BigUint::from(11u32);
+
+        // prover side random numbers
+        let x = BigUint::from(6u32);
+        let k = generate_random_below(&q);
+
+        // verifier side random numbers
+        let c = generate_random_below(&q);
+
+        let y1 = exponentiate(&alpha, &x, &p);
+        let y2 = exponentiate(&beta, &x, &p);
+        assert_eq!(y1, BigUint::from(2u32));
+        assert_eq!(y2, BigUint::from(3u32));
+
+        let r1 = exponentiate(&alpha, &k, &p);
+        let r2 = exponentiate(&beta, &k, &p);
+
+        let s = solve(&k, &c, &x, &q);
+
+        let result = verify(&r1, &r2, &y1, &y2, &s, &c, &p, &alpha, &beta);
+        assert!(result);
     }
 }
