@@ -70,8 +70,8 @@ impl Auth for AuthImpl {
             user_info.r2 = BigUint::from_bytes_be(&request.r2);
 
             let (_, _, _, q) = ZKP::get_constants();
-            let c = ZKP::generate_random_below(&q);
-            let auth_id = "kgsdfh".to_string();
+            let c = ZKP::generate_random_number_below(&q);
+            let auth_id = ZKP::generate_random_string(12);
 
             let auth_id_to_user = &mut self.auth_id_to_user.lock().unwrap();
             auth_id_to_user.insert(auth_id.clone(), user_name);
