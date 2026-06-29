@@ -66,12 +66,13 @@ impl Auth for AuthImpl {
         let user_name = request.user;
         let user_info_hashmap = &mut self.user_info.lock().unwrap();
         if let Some(user_info) = user_info_hashmap.get_mut(&user_name) {
-            user_info.r1 = BigUint::from_bytes_be(&request.r1);
-            user_info.r2 = BigUint::from_bytes_be(&request.r2);
-
             let (_, _, _, q) = ZKP::get_constants();
             let c = ZKP::generate_random_number_below(&q);
             let auth_id = ZKP::generate_random_string(12);
+
+            user_info.c = c.clone();
+            user_info.r1 = BigUint::from_bytes_be(&request.r1);
+            user_info.r2 = BigUint::from_bytes_be(&request.r2);
 
             let auth_id_to_user = &mut self.auth_id_to_user.lock().unwrap();
             auth_id_to_user.insert(auth_id.clone(), user_name);
@@ -87,7 +88,34 @@ impl Auth for AuthImpl {
         request: Request<AuthenticationAnswerRequest>,
     ) -> Result<Response<AuthenticationAnswerResponse>, Status> {
         println!("Processing Verification Request: {:?}", request);
-        todo!()
+        let request = request.into_inner();
+
+        let auth_id = request.auth_id;
+        let auth_id_user_hashmap = &mut self.auth_id_to_user.lock().unwrap();
+        if let Some(user_name) = auth_id_user_hashmap.get(&auth_id) {
+            let user_info_hashmap = &mut self.user_info.lock().unwrap();
+            let user_info = user_info_hashmap.get_mut(user_name).expect("AuthId not found in hashmap");
+            let s = BigUint::from_bytes_be(&request.s);
+
+            let (alpha, beta, p, q) = ZKP::get_constants();
+            let zkp = ZKP {
+                p,
+                q,
+                alpha,
+                beta,
+            };
+
+            let verification = zkp.verify(&user_info.r1, &user_info.r2, &user_info.y1, &user_info.y2, &s, &user_info.c);
+
+            if verification {
+                let session_id = ZKP::generate_random_string(12);
+                Ok(Response::new(AuthenticationAnswerResponse { session_id }))
+            } else {
+                Err(Status::new(Code::PermissionDenied, format!("AuthId: {}, did not pass challenge", auth_id)))
+            }
+        } else {
+            Err(Status::new(Code::NotFound, format!("AuthId: {}, not found in database", auth_id)))
+        }
     }
 }
 

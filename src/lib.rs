@@ -2,10 +2,10 @@ use num_bigint::{BigUint, RandBigInt};
 use rand::{self, Rng}; // Importing big unsigned integers, i.e +ve numbers including zero
 
 pub struct ZKP {
-    p: BigUint,
-    q: BigUint,
-    alpha: BigUint,
-    beta: BigUint,
+    pub p: BigUint,
+    pub q: BigUint,
+    pub alpha: BigUint,
+    pub beta: BigUint,
 }
 
 impl ZKP {
